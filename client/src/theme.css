@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap');
+@import "tailwindcss";
+@import "tailwindcss-safe-area";
+
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 28px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 30px;
+  --text-3xl--line-height: 36px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 40px;
+  --text-5xl: 48px;
+  --text-5xl--line-height: 52px;
+}
+
+:root {
+  color-scheme: light;
+  --bg: #eceef1;
+  --surface: #f4f5f7;
+  --text: #3d4451;
+  --dim: #8a919e;
+  --border: #dfe2e8;
+  --accent: #454c59;
+  --accent-break: #787f8a;
+  --shadow-dark: #d1d5dd;
+  --shadow-light: #ffffff;
+  --radius: 28px;
+  --space-surface: var(--surface);
+  --space-surface-alt: var(--surface);
+  --space-muted: var(--dim);
+  --space-border: var(--border);
+  --space-accent: var(--accent);
+  --font-round: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+}
+
+/* Neumorphism: raised soft surface */
+.neu-raised {
+  background: var(--surface);
+  box-shadow:
+    10px 10px 22px var(--shadow-dark),
+    -10px -10px 22px var(--shadow-light);
+}
+
+.neu-raised-sm {
+  background: var(--surface);
+  box-shadow:
+    6px 6px 14px var(--shadow-dark),
+    -6px -6px 14px var(--shadow-light);
+}
+
+/* Neumorphism: pressed-in well */
+.neu-inset {
+  background: var(--bg);
+  box-shadow:
+    inset 6px 6px 12px var(--shadow-dark),
+    inset -6px -6px 12px var(--shadow-light);
+}
+
+.neu-btn {
+  background: var(--surface);
+  box-shadow:
+    6px 6px 14px var(--shadow-dark),
+    -6px -6px 14px var(--shadow-light);
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.neu-btn:active {
+  box-shadow:
+    inset 4px 4px 9px var(--shadow-dark),
+    inset -4px -4px 9px var(--shadow-light);
+  transform: scale(0.98);
+}
+
+/* Liquid inside the clock: the surface drifts sideways so it looks
+   like it is gently sloshing; bubbles rise through carbonated drinks. */
+.liquid-wave {
+  animation: liquid-wave-slide 3.2s linear infinite;
+}
+
+@keyframes liquid-wave-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.liquid-bubble {
+  animation-name: liquid-bubble-rise;
+  animation-timing-function: ease-in;
+  animation-iteration-count: infinite;
+  opacity: 0;
+}
+
+@keyframes liquid-bubble-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-72px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neu-btn {
+    transition: none;
+  }
+  .notify-knob {
+    transition: none !important;
+  }
+  .liquid-wave,
+  .liquid-bubble {
+    animation: none;
+  }
+}
+
+/* Phone tap targets: at least 32px tall. */
+@layer base {
+  button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) {
+    min-height: 2rem;
+  }
+}
