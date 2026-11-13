@@ -5,7 +5,7 @@
 //   non-GET request is passed through untouched.
 
 const CACHE = "pomodoro-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
+const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
