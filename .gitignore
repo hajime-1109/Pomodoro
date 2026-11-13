@@ -10,3 +10,8 @@ server/dist/
 .bun-cache/
 .harness/
 audits/
+standalone/node_modules/
+standalone/dist/
+standalone/data/*.db
+standalone/data/*.db-shm
+standalone/data/*.db-wal
