@@ -62,7 +62,20 @@ self.addEventListener("push", (event) => {
     options.silent = true;
     options.vibrate = [200, 100, 200, 100, 400];
   }
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      // If the app is on screen, its own chime/vibration already fired
+      // at the end of the session; don't stack a notification on top.
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      if (windows.some((client) => client.visibilityState === "visible")) {
+        return;
+      }
+      await self.registration.showNotification(title, options);
+    })(),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
