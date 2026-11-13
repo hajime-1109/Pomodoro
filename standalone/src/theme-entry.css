@@ -1,0 +1,6 @@
+@import "../../client/src/theme.css";
+
+/* The app UI lives outside this package (in ../client/src), so Tailwind's
+   automatic content detection never scans it and no utility classes are
+   generated. Point Tailwind at the real sources explicitly. */
+@source "../../client/src";

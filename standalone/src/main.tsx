@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "../../client/src/App";
-import "../../client/src/theme.css";
+import "./theme-entry.css";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
