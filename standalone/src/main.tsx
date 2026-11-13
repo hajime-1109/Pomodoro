@@ -5,6 +5,14 @@ import { createRoot } from "react-dom/client";
 import { App } from "../../client/src/App";
 import "./theme-entry.css";
 
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // PWA is an enhancement; the app works without it.
+    });
+  });
+}
+
 const rootEl = document.getElementById("root");
 if (!rootEl) {
   throw new Error("missing root element");
