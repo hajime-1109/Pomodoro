@@ -21,15 +21,36 @@ function getClient() {
     });
   }
   if (!initPromise) {
-    initPromise = client.execute(`
-      CREATE TABLE IF NOT EXISTS stats (
-        id INTEGER PRIMARY KEY,
-        completed_count INTEGER NOT NULL DEFAULT 0,
-        quote_index INTEGER,
-        today_count INTEGER NOT NULL DEFAULT 0,
-        today_date TEXT
-      )
-    `);
+    initPromise = (async () => {
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS stats (
+          id INTEGER PRIMARY KEY,
+          completed_count INTEGER NOT NULL DEFAULT 0,
+          quote_index INTEGER,
+          today_count INTEGER NOT NULL DEFAULT 0,
+          today_date TEXT
+        )
+      `);
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          endpoint TEXT PRIMARY KEY,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      `);
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS reminders (
+          id TEXT PRIMARY KEY,
+          endpoint TEXT NOT NULL,
+          fire_at INTEGER NOT NULL,
+          mode TEXT NOT NULL,
+          silent INTEGER NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at INTEGER NOT NULL
+        )
+      `);
+    })();
   }
   return client;
 }
@@ -128,10 +149,120 @@ async function resetStats(db) {
   return { completedCount: 0, todayCount: 0, quoteIndex: null };
 }
 
+// --- Web Push reminders (option 4: server-scheduled push) -------------
+// The service worker can only RECEIVE a push; something has to send it
+// at the right moment. Scheduling is delegated to QStash: at session
+// start the client stores a reminder row here and this function asks
+// QStash to call /api/push-fire after the delay. Cancelling flips the
+// row's status, and push-fire refuses to send for non-pending rows, so
+// a stale QStash delivery is harmless.
+
+async function savePushSubscription(db, args) {
+  const sub = args?.subscription;
+  const endpoint = sub?.endpoint;
+  const p256dh = sub?.keys?.p256dh;
+  const auth = sub?.keys?.auth;
+  if (
+    typeof endpoint !== "string" ||
+    !endpoint.startsWith("https://") ||
+    typeof p256dh !== "string" ||
+    typeof auth !== "string"
+  ) {
+    throw new Error("Invalid push subscription");
+  }
+  await db.execute({
+    sql: `INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(endpoint) DO UPDATE
+            SET p256dh = excluded.p256dh, auth = excluded.auth`,
+    args: [endpoint, p256dh, auth, Date.now()],
+  });
+  return { ok: true };
+}
+
+async function cancelPendingReminders(db, endpoint) {
+  await db.execute({
+    sql: `UPDATE reminders SET status = 'cancelled'
+          WHERE endpoint = ? AND status = 'pending'`,
+    args: [endpoint],
+  });
+}
+
+async function scheduleReminder(db, args, ctx) {
+  const endpoint = args?.endpoint;
+  const fireAt = Number(args?.fireAt);
+  const mode = args?.mode === "break" ? "break" : "work";
+  const silent = args?.silent ? 1 : 0;
+  if (
+    typeof endpoint !== "string" ||
+    !endpoint.startsWith("https://") ||
+    !Number.isFinite(fireAt)
+  ) {
+    throw new Error("Invalid reminder");
+  }
+
+  await cancelPendingReminders(db, endpoint);
+  const id = crypto.randomUUID();
+  await db.execute({
+    sql: `INSERT INTO reminders
+            (id, endpoint, fire_at, mode, silent, status, created_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+    args: [id, endpoint, Math.round(fireAt), mode, silent, Date.now()],
+  });
+
+  // Publish the delayed callback to QStash when configured. Without a
+  // token (or from a non-public origin) the reminder stays stored but
+  // nothing will fire it; the client treats scheduling as best-effort.
+  const token = process.env.QSTASH_TOKEN;
+  const secret = process.env.PUSH_CALLBACK_SECRET;
+  const isPublicOrigin =
+    ctx?.origin &&
+    !ctx.origin.includes("localhost") &&
+    !ctx.origin.includes("127.0.0.1");
+  let scheduled = false;
+  if (token && secret && isPublicOrigin) {
+    try {
+      const callbackUrl = `${ctx.origin}/api/push-fire`;
+      const delaySec = Math.max(
+        0,
+        Math.round((fireAt - Date.now()) / 1000),
+      );
+      const response = await fetch(
+        `https://qstash.upstash.io/v2/publish/${encodeURIComponent(callbackUrl)}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+            "upstash-delay": `${delaySec}s`,
+            "upstash-retries": "2",
+          },
+          body: JSON.stringify({ reminderId: id, secret }),
+        },
+      );
+      scheduled = response.ok;
+    } catch {
+      scheduled = false;
+    }
+  }
+  return { ok: true, scheduled, reminderId: id };
+}
+
+async function cancelReminder(db, args) {
+  const endpoint = args?.endpoint;
+  if (typeof endpoint === "string") {
+    await cancelPendingReminders(db, endpoint);
+  }
+  return { ok: true };
+}
+
 const actions = {
   getStats,
   completeWorkSession,
   resetStats,
+  savePushSubscription,
+  scheduleReminder,
+  cancelReminder,
 };
 
 function sendJson(res, status, value) {
@@ -182,7 +313,9 @@ export default async function handler(req, res) {
       sendJson(res, 404, { error: `Unknown action: ${actionName}` });
       return;
     }
-    sendJson(res, 200, await actions[actionName](db));
+    const proto = req.headers["x-forwarded-proto"] || "https";
+    const ctx = { origin: `${proto}://${req.headers.host ?? ""}` };
+    sendJson(res, 200, await actions[actionName](db, body?.args ?? {}, ctx));
   } catch (error) {
     sendJson(res, 500, {
       error: error instanceof Error ? error.message : "Internal error",

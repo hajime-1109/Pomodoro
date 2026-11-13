@@ -192,6 +192,19 @@ function vibrate() {
   }
 }
 
+/**
+ * Lifecycle events for optional companions (e.g. the standalone's
+ * server-scheduled push reminder). Dispatched on window; with no
+ * listener — as in the Space — they change nothing.
+ */
+function dispatchTimerEvent(name: string, detail?: unknown) {
+  try {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  } catch {
+    // A side channel; never let it break the timer.
+  }
+}
+
 /** How the end of a session is announced: the gentle bell or vibration. */
 type NotifyMode = "chime" | "vibe";
 
@@ -311,6 +324,7 @@ export function App() {
   });
 
   const switchMode = useCallback((next: Mode) => {
+    dispatchTimerEvent("pomodoro:timer-stop");
     setMode(next);
     setSecondsLeft(DURATIONS[next]);
     setRunning(false);
@@ -319,6 +333,7 @@ export function App() {
   }, []);
 
   const finishSession = useCallback(() => {
+    dispatchTimerEvent("pomodoro:timer-stop");
     if (notifyMode === "chime") {
       playBell();
     } else {
@@ -367,6 +382,7 @@ export function App() {
         endAtRef.current = null;
       }
       setRunning(false);
+      dispatchTimerEvent("pomodoro:timer-stop");
     } else {
       if (secondsLeft <= 0) setSecondsLeft(DURATIONS[mode]);
       // Unlock audio on this user gesture so the bell can play when
@@ -374,6 +390,11 @@ export function App() {
       if (notifyMode === "chime") ensureAudioContext();
       endAtRef.current = null;
       setRunning(true);
+      const totalSeconds = secondsLeft <= 0 ? DURATIONS[mode] : secondsLeft;
+      dispatchTimerEvent("pomodoro:timer-start", {
+        mode,
+        endsAt: Date.now() + totalSeconds * 1000,
+      });
     }
   };
 

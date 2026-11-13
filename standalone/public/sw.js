@@ -31,6 +31,55 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Server-scheduled push (option 4): the push arrives via QStash ->
+// /api/push-fire -> the browser's push service. Showing the
+// notification is the service worker's job — this is the only alert
+// that can fire while the app is closed.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const isBreak = data.mode === "break";
+  const title = isBreak ? "休憩終了" : "作業終了";
+  const body = isBreak
+    ? "休憩おわり。次の25分を始めよう。"
+    : "25分お疲れさま。休憩に入ってね。";
+  const options = {
+    body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: "pomodoro-timer",
+    renotify: true,
+    timestamp: Date.now(),
+    data: { url: "/" },
+  };
+  if (data.silent) {
+    // Vibe mode: no sound. Vibration is best-effort — the platform may
+    // still suppress it for silent notifications.
+    options.silent = true;
+    options.vibrate = [200, 100, 200, 100, 400];
+  }
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((windows) => {
+        for (const client of windows) {
+          if ("focus" in client) return client.focus();
+        }
+        return self.clients.openWindow(target);
+      }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;

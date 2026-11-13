@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "../../client/src/App";
+import { initPush } from "./push";
 import "./theme-entry.css";
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
@@ -12,6 +13,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     });
   });
 }
+
+initPush();
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {

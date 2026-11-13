@@ -70,3 +70,21 @@ Turso (libSQL) に切り替えます。画面とAPIの口 (`POST /actions`) は
 
 以降は `main` ブランチへの push で自動デプロイされます。
 環境変数が未設定の場合、APIは 503 を返し、画面の回数は表示されません。
+
+## バックグラウンド通知 (任意)
+
+アプリを閉じていても終了時刻に通知を受け取るには、サーバー予約の
+Web Push を有効にします。タイマー開始時に `api/actions.js` が予約を
+Turso に保存し、Upstash QStash が終了時刻に `api/push-fire` を呼んで
+Push を送信します (Service Worker 自体には時刻で起きる機能が無いため、
+送信役が別に要ります)。
+
+追加の環境変数 (Production):
+
+- `QSTASH_TOKEN` — Upstash QStash のトークン
+- `PUSH_CALLBACK_SECRET` — QStash からのコールバック認証用の秘密文字列
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — Web Push の VAPID 鍵ペア
+  (公開鍵は `src/push.ts` に埋め込んだものと一致させる)
+
+未設定の場合は予約が保存されるだけで発火せず、アプリ内の
+チャイム/バイブ動作に影響しません。
