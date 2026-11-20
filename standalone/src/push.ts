@@ -108,12 +108,22 @@ async function handleTimerStart(event: Event) {
   if (typeof endsAt !== "number") return;
   const endpoint = await ensureSubscription();
   if (!endpoint) return;
-  await postAction("scheduleReminder", {
+  const result = (await postAction("scheduleReminder", {
     endpoint,
     fireAt: endsAt,
     mode: detail?.mode === "break" ? "break" : "work",
     silent: isSilentMode(),
-  });
+  })) as { scheduled?: boolean } | null;
+  if (result && result.scheduled === false) {
+    // The reminder row is stored but nothing will fire it (QStash /
+    // push env vars not configured on the server). Until 2026-11-20
+    // this was silently ignored, so background alerts failed with no
+    // trace anywhere. Keep it console-only: no UI change.
+    console.warn(
+      "[pomodoro-push] Reminder stored but NOT scheduled " +
+        "(server push is not configured); background alert will not fire.",
+    );
+  }
 }
 
 async function handleTimerStop() {
@@ -128,9 +138,13 @@ export function initPush() {
   if (initialized) return;
   initialized = true;
   window.addEventListener("pomodoro:timer-start", (event) => {
-    void handleTimerStart(event).catch(() => {});
+    void handleTimerStart(event).catch((error) => {
+      console.warn("[pomodoro-push] Failed to schedule reminder:", error);
+    });
   });
   window.addEventListener("pomodoro:timer-stop", () => {
-    void handleTimerStop().catch(() => {});
+    void handleTimerStop().catch((error) => {
+      console.warn("[pomodoro-push] Failed to cancel reminder:", error);
+    });
   });
 }

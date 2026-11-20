@@ -57,9 +57,13 @@ self.addEventListener("push", (event) => {
     data: { url: "/" },
   };
   if (data.silent) {
-    // Vibe mode: no sound. Vibration is best-effort — the platform may
-    // still suppress it for silent notifications.
-    options.silent = true;
+    // Vibe mode: vibrate with the session pattern. Do NOT also set
+    // options.silent: the Notifications API forbids silent:true
+    // together with a vibrate pattern — showNotification() throws a
+    // TypeError and no notification is shown at all (this was the
+    // background-vibe bug found on 2026-11-20). Whether an OS sound
+    // also plays is left to the device's notification settings for
+    // this app; the pattern below is what guarantees the vibration.
     options.vibrate = [200, 100, 200, 100, 400];
   }
   event.waitUntil(

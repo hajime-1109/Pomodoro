@@ -227,8 +227,12 @@ async function scheduleReminder(db, args, ctx) {
         0,
         Math.round((fireAt - Date.now()) / 1000),
       );
+      // QStash takes the destination as the RAW url in the path
+      // (official examples: POST /v2/publish/https://example.com/...).
+      // URL-encoding it made publish fail, so the reminder never fired
+      // (bug found 2026-11-20). Do not encodeURIComponent this.
       const response = await fetch(
-        `https://qstash.upstash.io/v2/publish/${encodeURIComponent(callbackUrl)}`,
+        `https://qstash.upstash.io/v2/publish/${callbackUrl}`,
         {
           method: "POST",
           headers: {
@@ -241,7 +245,17 @@ async function scheduleReminder(db, args, ctx) {
         },
       );
       scheduled = response.ok;
-    } catch {
+      if (!response.ok) {
+        // Leave a trace in the Vercel runtime logs: until 2026-11-20
+        // this failure was invisible, so a broken reminder looked
+        // exactly like a working one from the client.
+        console.error(
+          `QStash publish failed: ${response.status}`,
+          await response.text().catch(() => ""),
+        );
+      }
+    } catch (error) {
+      console.error("QStash publish threw:", error);
       scheduled = false;
     }
   }
