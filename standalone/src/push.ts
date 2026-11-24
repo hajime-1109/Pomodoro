@@ -14,7 +14,7 @@
 // VAPID public key. The matching private key lives only in the
 // server's environment (VAPID_PRIVATE_KEY).
 const VAPID_PUBLIC_KEY =
-  "BHk_d4F7IGnMapxjCT6RQzRDOwWjdAQbdUAkPUyFFy3VqViww01qse2dswFmQ1F6GVhcPcSjYf3g0jngeNC7xAU";
+  "BFdJTntR3zN_nHNrAp0kOVPgjT9-Pg7ShK7nvxw1sYCDOBBZhd88adyJEPQ_M3slBgeqsM_zBn9OUODoc0jXkYc";
 
 const ENDPOINT_STORAGE_KEY = "pomodoro-push-endpoint";
 const NOTIFY_MODE_STORAGE_KEY = "pomodoro-notify-mode";
