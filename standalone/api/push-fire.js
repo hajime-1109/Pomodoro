@@ -6,7 +6,27 @@
 // the app is closed.
 
 import { createClient } from "@libsql/client";
+import crypto from "node:crypto";
 import webpush from "web-push";
+
+// Only VAPID_PRIVATE_KEY is configured by hand. The public key is
+// derived from it (VAPID uses an EC P-256 key pair, and the client
+// already carries the matching public key), so there is no separate
+// VAPID_PUBLIC_KEY env var to keep in sync.
+function deriveVapidPublicKey(privateKey) {
+  const raw = Buffer.from(
+    privateKey.replace(/-/g, "+").replace(/_/g, "/"),
+    "base64",
+  );
+  const ecdh = crypto.createECDH("prime256v1");
+  ecdh.setPrivateKey(raw);
+  return ecdh
+    .getPublicKey(null, "uncompressed")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 let client = null;
 let initPromise = null;
@@ -74,16 +94,14 @@ export default async function handler(req, res) {
     return;
   }
 
-  const secret = process.env.PUSH_CALLBACK_SECRET;
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!secret || !publicKey || !privateKey) {
+  if (!privateKey) {
     sendJson(res, 503, {
-      error:
-        "Push is not configured. Set PUSH_CALLBACK_SECRET, VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.",
+      error: "Push is not configured. Set VAPID_PRIVATE_KEY.",
     });
     return;
   }
+  const publicKey = deriveVapidPublicKey(privateKey);
 
   const db = getClient();
   if (!db) {
@@ -94,7 +112,10 @@ export default async function handler(req, res) {
   try {
     await initPromise;
     const body = await readBody(req);
-    if (body?.secret !== secret || typeof body?.reminderId !== "string") {
+    // The reminderId is an unguessable UUID created server-side, and
+    // the row must still be 'pending' below, so the id itself acts as
+    // the capability — no separate callback secret to configure.
+    if (typeof body?.reminderId !== "string") {
       sendJson(res, 401, { error: "Unauthorized" });
       return;
     }

@@ -214,13 +214,12 @@ async function scheduleReminder(db, args, ctx) {
   // token (or from a non-public origin) the reminder stays stored but
   // nothing will fire it; the client treats scheduling as best-effort.
   const token = process.env.QSTASH_TOKEN;
-  const secret = process.env.PUSH_CALLBACK_SECRET;
   const isPublicOrigin =
     ctx?.origin &&
     !ctx.origin.includes("localhost") &&
     !ctx.origin.includes("127.0.0.1");
   let scheduled = false;
-  if (token && secret && isPublicOrigin) {
+  if (token && isPublicOrigin) {
     try {
       const callbackUrl = `${ctx.origin}/api/push-fire`;
       const delaySec = Math.max(
@@ -241,7 +240,7 @@ async function scheduleReminder(db, args, ctx) {
             "upstash-delay": `${delaySec}s`,
             "upstash-retries": "2",
           },
-          body: JSON.stringify({ reminderId: id, secret }),
+          body: JSON.stringify({ reminderId: id }),
         },
       );
       scheduled = response.ok;
